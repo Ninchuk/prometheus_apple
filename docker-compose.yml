@@ -1,0 +1,41 @@
+version: '3'
+services:
+  scan:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: always
+    depends_on:
+      - prometheus
+    networks:
+      - scan
+
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - 4000:3000
+    depends_on:
+      - prometheus
+      - scan
+    restart: always
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=
+    networks:
+      - scan
+
+  prometheus:
+    image: prom/prometheus
+    ports:
+      - 9090:9090
+    restart: always
+    networks:
+      - scan
+
+
+networks:
+  scan:
+    driver: bridge
+
