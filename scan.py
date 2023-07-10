@@ -1,5 +1,5 @@
 import argparse
-# import bluetooth._bluetooth as bluez
+import bluetooth._bluetooth as bluez
 import json
 import hashlib
 import random
@@ -25,11 +25,10 @@ from dictonary import (
     ble_packets_types,
     dev_sig,
     iphones,
-    mac_advtype_datastr_rssi
 )
 from prometheus_client import Gauge, start_http_server
-# from utils.bluetooth_utils import (toggle_device, enable_le_scan, parse_le_advertising_events, disable_le_scan,
-#                                    raw_packet_to_str, start_le_advertising, stop_le_advertising)
+from utils.bluetooth_utils import (toggle_device, enable_le_scan, parse_le_advertising_events, disable_le_scan,
+                                   raw_packet_to_str, start_le_advertising, stop_le_advertising)
 
 verb_messages = []
 resolved_macs = []
@@ -49,9 +48,9 @@ region_check_url = ''
 dictOfss = {}
 imessage_url = ''
 dev_id = 0  # the bluetooth device is hci0
-# iwdev = 'wlan0'
-#
-# toggle_device(dev_id, True)
+iwdev = 'wlan0'
+
+toggle_device(dev_id, True)
 
 
 
@@ -82,14 +81,9 @@ if args.airdrop:
     from opendrop2.cli import AirDropCli
 
 
-def le_advertise_packet_handler(mac_advtype_datastr_rssi):
-    for entry in mac_advtype_datastr_rssi:
-        entry_values = entry.split()
-        mac = entry_values[0]
-        adv_type = entry_values[1]
-        data_str = entry_values[2]
-        rssi = entry_values[3]
-        read_packet(mac, data_str, rssi)
+def le_advertise_packet_handler(mac, adv_type, data, rssi):
+    data_str = raw_packet_to_str(data)
+    read_packet(mac, data_str, rssi)
 
 
 def read_packet(mac, data_str, rssi):
@@ -421,18 +415,18 @@ def get_names(lat=False):
         phone_number_info[phone]['name'] = name
         phone_number_info[phone]['carrier'] = carrier
         phone_number_info[phone]['region'] = region
-    # init_bluez()
+    init_bluez()
 
 
-# def init_bluez():
-#     global sock
-#     try:
-#         sock = bluez.hci_open_dev(dev_id)
-#     except:
-#         print("Cannot open bluetooth device %i" % dev_id)
-#         raise
-#
-#     enable_le_scan(sock, filter_duplicates=False)
+def init_bluez():
+    global sock
+    try:
+        sock = bluez.hci_open_dev(dev_id)
+    except:
+        print("Cannot open bluetooth device %i" % dev_id)
+        raise
+
+    enable_le_scan(sock, filter_duplicates=False)
 
 
 def get_hlr_info(mac):
@@ -670,93 +664,92 @@ def get_device_name(mac_addr):
         return_value = devices_models.get(d_n_str, d_n_str)
     else:
         return_value = ''
-    # init_bluez()
+    init_bluez()
     resolved_devs.append(mac_addr)
     return return_value
 
 
-# def start_listetninig():
-#     AirDropCli(["find"])
-#
-#
-# def get_hash(data, size=6):
-#     return hashlib.sha256(data.encode('utf-8')).hexdigest()[:size]
-#
-#
-# def get_ssids():
-#     global dictOfss
-#     proc = subprocess.Popen(['ip', 'link', 'set', iwdev, 'up'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-#     stdout, stderr = proc.communicate()
-#     kill = lambda process: process.kill()
-#     cmd = ['iwlist', iwdev, 'scan']
-#     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-#     timer = Timer(3, kill, [proc])
-#     try:
-#         timer.start()
-#         ssids, stderr = proc.communicate()
-#     finally:
-#         timer.cancel()
-#     if ssids:
-#         result = re.findall('ESSID:"(.*)"\n', str(ssids, 'utf-8'))
-#         ss = list(set(result))
-#         dictOfss = {get_hash(s): s for s in ss}
-#     else:
-#         dictOfss = {}
-#
-#
-# def adv_airdrop():
-#     while True:
-#         dev_id = 0
-#         toggle_device(dev_id, True)
-#         header = (0x02, 0x01, 0x1a, 0x1b, 0xff, 0x4c, 0x00)
-#         data1 = (0x05, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)
-#         apple_id = (0x00, 0x00)
-#         phone = (0x00, 0x00)
-#         email = (0xb7, 0x9b)
-#         data2 = (0x00, 0x00, 0x00, 0x10, 0x02, 0x0b, 0x00)
-#         try:
-#             sock = bluez.hci_open_dev(dev_id)
-#         except:
-#             print("Cannot open bluetooth device %i" % dev_id)
-#             raise
-#         start_le_advertising(sock, adv_type=0x02, min_interval=500, max_interval=500,
-#                              data=(header + data1 + apple_id + phone + email + data2))
-#         time.sleep(10)
-#         stop_le_advertising(sock)
-#
-#
-# def do_sniff(prnt):
-#     global phones
-#     try:
-#         parse_le_advertising_events(sock,
-#                                     handler=le_advertise_packet_handler,
-#                                     debug=False)
-#     except KeyboardInterrupt:
-#         print("Stop")
-#         disable_le_scan(sock)
-#
-# if args.ssid:
-#     thread_ssid = Thread(target=get_ssids, args=())
-#     thread_ssid.daemon = True
-#     thread_ssid.start()
-#
-# if args.airdrop:
-#     thread2 = Thread(target=start_listetninig, args=())
-#     thread2.daemon = True
-#     thread2.start()
-#
-#     thread3 = Thread(target=adv_airdrop, args=())
-#     thread3.daemon = True
-#     thread3.start()
-le_advertise_packet_handler(mac_advtype_datastr_rssi)
+def start_listetninig():
+    AirDropCli(["find"])
+
+
+def get_hash(data, size=6):
+    return hashlib.sha256(data.encode('utf-8')).hexdigest()[:size]
+
+
+def get_ssids():
+    global dictOfss
+    proc = subprocess.Popen(['ip', 'link', 'set', iwdev, 'up'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    stdout, stderr = proc.communicate()
+    kill = lambda process: process.kill()
+    cmd = ['iwlist', iwdev, 'scan']
+    proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    timer = Timer(3, kill, [proc])
+    try:
+        timer.start()
+        ssids, stderr = proc.communicate()
+    finally:
+        timer.cancel()
+    if ssids:
+        result = re.findall('ESSID:"(.*)"\n', str(ssids, 'utf-8'))
+        ss = list(set(result))
+        dictOfss = {get_hash(s): s for s in ss}
+    else:
+        dictOfss = {}
+
+
+def adv_airdrop():
+    while True:
+        dev_id = 0
+        toggle_device(dev_id, True)
+        header = (0x02, 0x01, 0x1a, 0x1b, 0xff, 0x4c, 0x00)
+        data1 = (0x05, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)
+        apple_id = (0x00, 0x00)
+        phone = (0x00, 0x00)
+        email = (0xb7, 0x9b)
+        data2 = (0x00, 0x00, 0x00, 0x10, 0x02, 0x0b, 0x00)
+        try:
+            sock = bluez.hci_open_dev(dev_id)
+        except:
+            print("Cannot open bluetooth device %i" % dev_id)
+            raise
+        start_le_advertising(sock, adv_type=0x02, min_interval=500, max_interval=500,
+                             data=(header + data1 + apple_id + phone + email + data2))
+        time.sleep(10)
+        stop_le_advertising(sock)
+
+
+def do_sniff(prnt):
+    global phones
+    try:
+        parse_le_advertising_events(sock,
+                                    handler=le_advertise_packet_handler,
+                                    debug=False)
+    except KeyboardInterrupt:
+        print("Stop")
+        disable_le_scan(sock)
+
+if args.ssid:
+    thread_ssid = Thread(target=get_ssids, args=())
+    thread_ssid.daemon = True
+    thread_ssid.start()
+
+if args.airdrop:
+    thread2 = Thread(target=start_listetninig, args=())
+    thread2.daemon = True
+    thread2.start()
+
+    thread3 = Thread(target=adv_airdrop, args=())
+    thread3.daemon = True
+    thread3.start()
+
 if args.verb:
     logFile = '/tmp/apple_bleee_{}'.format(random.randint(1, 3000))
 
-# init_bluez()
-# thread1 = Thread(target=do_sniff, args=(False,))
-# thread1.daemon = True
-# thread1.start()
-phones = {'76:7A:2F:6E:F3:B8': {'state': '<unknown>', 'device': 'Watch', 'wifi': '', 'os': '', 'phone': '', 'time': 1686993188, 'rssi': '-62'}, '6B:A1:87:7D:CA:5A': {'state': '<unknown>', 'device': '<unknown>', 'wifi': 'On', 'os': 'iOS12', 'phone': '', 'time': 1686993188, 'rssi': '-73'}, '6F:2D:30:B4:5C:61': {'state': '<unknown>', 'device': '<unknown>', 'wifi': 'Off', 'os': 'iOS12', 'phone': '', 'time': 1686993188, 'rssi': '-66'}, '75:84:EE:18:B5:A0': {'state': 'W Home screen', 'device': 'MacBook', 'wifi': 'On', 'os': 'iOS13', 'phone': '', 'time': 1686993188, 'rssi': '-88'}, '64:18:CA:02:0B:D6': {'state': '<unknown>', 'device': 'iPhone', 'wifi': 'Off', 'os': 'iOS13', 'phone': '', 'time': 1686993188, 'rssi': '-82'}}
+init_bluez()
+thread1 = Thread(target=do_sniff, args=(False,))
+thread1.daemon = True
+thread1.start()
 
 device_count = Counter(device_data['device'] for device_data in phones.values())
 rssi_metric = Gauge('rssi_metric', 'RSSI value', ['mac_address', 'device'])
