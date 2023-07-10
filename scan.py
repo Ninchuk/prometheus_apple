@@ -756,6 +756,7 @@ if args.verb:
 # thread1 = Thread(target=do_sniff, args=(False,))
 # thread1.daemon = True
 # thread1.start()
+phones = {'76:7A:2F:6E:F3:B8': {'state': '<unknown>', 'device': 'Watch', 'wifi': '', 'os': '', 'phone': '', 'time': 1686993188, 'rssi': '-62'}, '6B:A1:87:7D:CA:5A': {'state': '<unknown>', 'device': '<unknown>', 'wifi': 'On', 'os': 'iOS12', 'phone': '', 'time': 1686993188, 'rssi': '-73'}, '6F:2D:30:B4:5C:61': {'state': '<unknown>', 'device': '<unknown>', 'wifi': 'Off', 'os': 'iOS12', 'phone': '', 'time': 1686993188, 'rssi': '-66'}, '75:84:EE:18:B5:A0': {'state': 'W Home screen', 'device': 'MacBook', 'wifi': 'On', 'os': 'iOS13', 'phone': '', 'time': 1686993188, 'rssi': '-88'}, '64:18:CA:02:0B:D6': {'state': '<unknown>', 'device': 'iPhone', 'wifi': 'Off', 'os': 'iOS13', 'phone': '', 'time': 1686993188, 'rssi': '-82'}}
 
 device_count = Counter(device_data['device'] for device_data in phones.values())
 rssi_metric = Gauge('rssi_metric', 'RSSI value', ['mac_address', 'device'])
