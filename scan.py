@@ -765,7 +765,6 @@ while True:
         rssi_metric.labels(mac_address, device_data['device']).set(float(device_data.get('rssi', 0)))
         device = device_data.get('device')
         if device:
-            device_name = get_device_name(mac_address)
             mac_addresses = mac_addresses_dict.get(device, [])
             mac_addresses.append(mac_address)
             mac_addresses_dict[device] = mac_addresses
