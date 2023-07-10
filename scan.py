@@ -1,14 +1,16 @@
 import argparse
 # import bluetooth._bluetooth as bluez
 import json
+import hashlib
 import random
 import re
 import requests
 import sqlite3
 import time
-from threading import Timer, Thread
 import subprocess
 import urllib3
+from collections import Counter
+from threading import Timer, Thread
 from bs4 import BeautifulSoup
 from dictonary import (
     phone_states,
@@ -22,17 +24,17 @@ from dictonary import (
     hotspot_net,
     ble_packets_types,
     dev_sig,
-    mac_advtype_datastr_rssi,
     iphones,
+    mac_advtype_datastr_rssi
 )
-from prometheus_client import Gauge, Info, push_to_gateway, CollectorRegistry
+from prometheus_client import Gauge, start_http_server
 # from utils.bluetooth_utils import (toggle_device, enable_le_scan, parse_le_advertising_events, disable_le_scan,
 #                                    raw_packet_to_str, start_le_advertising, stop_le_advertising)
 
 verb_messages = []
-resolved_macs = []  # store mac_addr
+resolved_macs = []
 resolved_devs = []
-phones = {}  # {'76:7A:2F:6E:F3:B8': {'state': '<unknown>', 'device': '<unknown>', 'wifi': '', 'os': '', 'phone': '', 'time': 1686831418, 'rssi': '-62'}
+phones = {}
 victims = []
 hash2phone = {}
 hash2phone_url = ''
@@ -47,6 +49,8 @@ region_check_url = ''
 dictOfss = {}
 imessage_url = ''
 dev_id = 0  # the bluetooth device is hci0
+# iwdev = 'wlan0'
+#
 # toggle_device(dev_id, True)
 
 
@@ -69,6 +73,13 @@ parser.add_argument('-d', '--active', action='store_true', help='Get devices nam
 parser.add_argument('-v', '--verb', help='Verbose output. Filter actions (All, Nearby, Handoff, etc)')
 parser.add_argument('-t', '--ttl', type=int, default=15, help='ttl')
 args = parser.parse_args()
+
+if args.check_phone:
+    # import from TrueCaller API lib (sorry, but we did some RE for that :))
+    print("Sorry, but we don't provide this functionality as a part of this PoC")
+    exit(1)
+if args.airdrop:
+    from opendrop2.cli import AirDropCli
 
 
 def le_advertise_packet_handler(mac_advtype_datastr_rssi):
@@ -664,6 +675,56 @@ def get_device_name(mac_addr):
     return return_value
 
 
+# def start_listetninig():
+#     AirDropCli(["find"])
+#
+#
+# def get_hash(data, size=6):
+#     return hashlib.sha256(data.encode('utf-8')).hexdigest()[:size]
+#
+#
+# def get_ssids():
+#     global dictOfss
+#     proc = subprocess.Popen(['ip', 'link', 'set', iwdev, 'up'], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#     stdout, stderr = proc.communicate()
+#     kill = lambda process: process.kill()
+#     cmd = ['iwlist', iwdev, 'scan']
+#     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+#     timer = Timer(3, kill, [proc])
+#     try:
+#         timer.start()
+#         ssids, stderr = proc.communicate()
+#     finally:
+#         timer.cancel()
+#     if ssids:
+#         result = re.findall('ESSID:"(.*)"\n', str(ssids, 'utf-8'))
+#         ss = list(set(result))
+#         dictOfss = {get_hash(s): s for s in ss}
+#     else:
+#         dictOfss = {}
+#
+#
+# def adv_airdrop():
+#     while True:
+#         dev_id = 0
+#         toggle_device(dev_id, True)
+#         header = (0x02, 0x01, 0x1a, 0x1b, 0xff, 0x4c, 0x00)
+#         data1 = (0x05, 0x12, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01)
+#         apple_id = (0x00, 0x00)
+#         phone = (0x00, 0x00)
+#         email = (0xb7, 0x9b)
+#         data2 = (0x00, 0x00, 0x00, 0x10, 0x02, 0x0b, 0x00)
+#         try:
+#             sock = bluez.hci_open_dev(dev_id)
+#         except:
+#             print("Cannot open bluetooth device %i" % dev_id)
+#             raise
+#         start_le_advertising(sock, adv_type=0x02, min_interval=500, max_interval=500,
+#                              data=(header + data1 + apple_id + phone + email + data2))
+#         time.sleep(10)
+#         stop_le_advertising(sock)
+#
+#
 # def do_sniff(prnt):
 #     global phones
 #     try:
@@ -673,47 +734,51 @@ def get_device_name(mac_addr):
 #     except KeyboardInterrupt:
 #         print("Stop")
 #         disable_le_scan(sock)
-
-
-
+#
+# if args.ssid:
+#     thread_ssid = Thread(target=get_ssids, args=())
+#     thread_ssid.daemon = True
+#     thread_ssid.start()
+#
+# if args.airdrop:
+#     thread2 = Thread(target=start_listetninig, args=())
+#     thread2.daemon = True
+#     thread2.start()
+#
+#     thread3 = Thread(target=adv_airdrop, args=())
+#     thread3.daemon = True
+#     thread3.start()
+le_advertise_packet_handler(mac_advtype_datastr_rssi)
 if args.verb:
     logFile = '/tmp/apple_bleee_{}'.format(random.randint(1, 3000))
-
-le_advertise_packet_handler(mac_advtype_datastr_rssi)
 
 # init_bluez()
 # thread1 = Thread(target=do_sniff, args=(False,))
 # thread1.daemon = True
 # thread1.start()
-print(phones)
 
-gauge_metrics = ['rssi']
-info_metrics = ['state', 'device', 'wifi', 'os', 'phone', 'time']
+device_count = Counter(device_data['device'] for device_data in phones.values())
+rssi_metric = Gauge('rssi_metric', 'RSSI value', ['mac_address', 'device'])
+device_metric = Gauge('device_metric', 'Device', ['device'])
+mac_addresses_metric = Gauge('mac_addresses_metric', 'MAC Addresses', ['device', 'mac_address'])
+mac_addresses_dict = {}
 
-registry = CollectorRegistry()
 
-i = Info('phone_data_info', 'Phone data')
-for mac, phone in phones.items():
-    i.info({
-        'mac_address': mac,
-        'state': phone['state'],
-        'device': phone['device'],
-        'wifi': phone['wifi'],
-        'os': phone['os'],
-        'phone': phone['phone'],
-        'time': phone['time']
-    })
+start_http_server(8000)
 
-gauges = {}
-for mac_address, phone_data in phones.items():
-    info_data = {'mac_address': mac_address}
-    for attribute, value in phone_data.items():
-        if attribute in gauge_metrics:
-            if attribute not in gauges:
-                gauges[attribute] = Gauge(f'phone_data_{attribute}', 'Phone Data', ['mac_address'], registry=registry)
-            gauges[attribute].labels(mac_address).set(float(value))
-        elif attribute in info_metrics:
-            info_data[attribute] = value
-    i.info(info_data)
+while True:
+    for mac_address, device_data in phones.items():
+        rssi_metric.labels(mac_address, device_data['device']).set(float(device_data.get('rssi', 0)))
+        device = device_data.get('device')
+        if device:
+            mac_addresses = mac_addresses_dict.get(device, [])
+            mac_addresses.append(mac_address)
+            mac_addresses_dict[device] = mac_addresses
 
-push_to_gateway('localhost:9090', job='my_scan_script', registry=registry)
+    for device, count in device_count.items():
+        device_metric.labels(device).set(count)
+
+    for device, mac_addresses in mac_addresses_dict.items():
+
+        for mac_address in mac_addresses:
+            mac_addresses_metric.labels(device, mac_address).set(1)
