@@ -49,6 +49,9 @@ dictOfss = {}
 imessage_url = ''
 dev_id = 0  # the bluetooth device is hci0
 iwdev = 'wlan0'
+dump_list = [('76:7A:2F:6E:F3:B8', '1202011a020a040bff4c0010064f1d90a06358', -64),
+             ('6B:A1:87:7D:CA:5A', '1102011a020a0c0aff4c0010050f1c634821', -57),
+             ('6F:2D:30:B4:5C:61', '1102011a020a060aff4c0010052818666d0d', -64)]
 
 toggle_device(dev_id, True)
 
@@ -722,12 +725,15 @@ def adv_airdrop():
 def do_sniff(prnt):
     global phones
     try:
-        parse_le_advertising_events(sock,
-                                    handler=le_advertise_packet_handler,
-                                    debug=False)
+        while True:
+            for mac, data_str, rssi in dump_list:
+                rssi += random.randint(-10, 10)
+                read_packet(mac, data_str, rssi)
+            time.sleep(1)
     except KeyboardInterrupt:
         print("Stop")
         disable_le_scan(sock)
+
 
 if args.ssid:
     thread_ssid = Thread(target=get_ssids, args=())
