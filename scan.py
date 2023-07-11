@@ -751,6 +751,9 @@ thread1 = Thread(target=do_sniff, args=(False,))
 thread1.daemon = True
 thread1.start()
 
+for mac_address, device_data in phones.items():
+    device_data['device'] = get_device_name(mac_address)
+
 device_count = Counter(device_data['device'] for device_data in phones.values())
 rssi_metric = Gauge('rssi_metric', 'RSSI value', ['mac_address', 'device'])
 device_metric = Gauge('device_metric', 'Device', ['device'])
