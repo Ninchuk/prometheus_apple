@@ -754,7 +754,6 @@ thread1.start()
 for mac_address, device_data in phones.items():
     device_data['device'] = get_device_name(mac_address)
 
-device_count = Counter(device_data['device'] for device_data in phones.values())
 rssi_metric = Gauge('rssi_metric', 'RSSI value', ['mac_address', 'device'])
 device_metric = Gauge('device_metric', 'Device', ['device'])
 mac_addresses_metric = Gauge('mac_addresses_metric', 'MAC Addresses', ['device', 'mac_address'])
@@ -767,10 +766,12 @@ while True:
     for mac_address, device_data in phones.items():
         rssi_metric.labels(mac_address, device_data['device']).set(float(device_data.get('rssi', 0)))
         device = device_data.get('device')
+
         if device:
             mac_addresses = mac_addresses_dict.get(device, [])
             mac_addresses.append(mac_address)
             mac_addresses_dict[device] = mac_addresses
+    device_count = Counter(device_data['device'] for device_data in phones.values())
 
     for device, count in device_count.items():
         device_metric.labels(device).set(count)
